@@ -80,3 +80,17 @@
     @apply bg-background text-foreground;
   }
 }
+
+h1 {
+  color: #2874a6;
+}
+
+input[type="text"] {
+  border: 2px solid #2874a6 !important;
+  /* ... rest of input styling ... */
+}
+
+/* Or if you're using a form class, try: */
+.form input {
+  border: 2px solid #2874a6 !important;
+}

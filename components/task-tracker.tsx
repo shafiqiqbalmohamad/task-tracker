@@ -1,61 +1,106 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
-import TaskItem from '@/components/task-item'
-import { Task } from '@/lib/types'
-import { generateId } from '@/lib/utils'
+import React, { useState } from "react";
+import TaskItem from "./task-item";
+import type { Task } from "../lib/types";
+import { supabase } from "../lib/supabaseClient";
 
-export default function TaskTracker() {
-  const [tasks, setTasks] = useState<Task[]>([])
-  const [newTaskText, setNewTaskText] = useState('')
+interface TaskTrackerProps {
+  tasks: Task[];
+  isLoading: boolean;
+  error: string | null;
+  onFetch: () => Promise<void>;
+}
 
-  const addTask = () => {
+const TaskTracker = ({
+  tasks,
+  isLoading,
+  error,
+  onFetch,
+}: TaskTrackerProps) => {
+  const [newTaskText, setNewTaskText] = useState("");
+
+  const addTask = async () => {
     if (newTaskText.trim()) {
-      setTasks([...tasks, { id: generateId(), text: newTaskText, completed: false }])
-      setNewTaskText('')
+      const { error: supabaseError } = await supabase
+        .from("tasks")
+        .insert([{ task: newTaskText, completed: false }]);
+
+      if (supabaseError) {
+        console.error("Error adding task:", supabaseError);
+        return;
+      }
+
+      setNewTaskText("");
+      onFetch();
     }
-  }
+  };
 
-  const toggleTask = (id: string) => {
-    setTasks(tasks.map(task => 
-      task.id === id ? { ...task, completed: !task.completed } : task
-    ))
-  }
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      addTask();
+    }
+  };
 
-  const deleteTask = (id: string) => {
-    setTasks(tasks.filter(task => task.id !== id))
-  }
-
-  const sortedTasks = [...tasks].sort((a, b) => {
-    if (a.completed === b.completed) return 0
-    return a.completed ? 1 : -1
-  })
+  if (isLoading) return <div>Loading...</div>;
+  if (error) return <div>Error: {error}</div>;
 
   return (
     <div className="space-y-4">
       <div className="flex space-x-2">
-        <Input
+        <input
           type="text"
           placeholder="Add a new task"
           value={newTaskText}
-          onChange={(e) => setNewTaskText(e.target.value)}
-          onKeyPress={(e) => e.key === 'Enter' && addTask()}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+            setNewTaskText(e.target.value)
+          }
+          onKeyPress={handleKeyPress}
+          className="flex-1 p-2 border rounded border-[#0066cc]"
         />
-        <Button onClick={addTask}>Add Task</Button>
+        <button
+          onClick={addTask}
+          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+        >
+          Add Task
+        </button>
       </div>
       <ul className="space-y-2">
-        {sortedTasks.map(task => (
+        {tasks.map((task) => (
           <TaskItem
             key={task.id}
             task={task}
-            onToggle={() => toggleTask(task.id)}
-            onDelete={() => deleteTask(task.id)}
+            onToggle={async () => {
+              const { error: supabaseError } = await supabase
+                .from("tasks")
+                .update({ completed: !task.completed })
+                .eq("id", task.id);
+
+              if (supabaseError) {
+                console.error("Error updating task:", supabaseError);
+                return;
+              }
+
+              onFetch();
+            }}
+            onDelete={async () => {
+              const { error: supabaseError } = await supabase
+                .from("tasks")
+                .delete()
+                .eq("id", task.id);
+
+              if (supabaseError) {
+                console.error("Error deleting task:", supabaseError);
+                return;
+              }
+
+              onFetch();
+            }}
           />
         ))}
       </ul>
     </div>
-  )
-}
+  );
+};
 
+export default TaskTracker;
